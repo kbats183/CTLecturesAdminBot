@@ -1,0 +1,6 @@
+/.idea/
+/.gradle/
+/.oauth-credentials/
+/build/
+/client_secrets.json
+/preview
