@@ -1,28 +1,19 @@
 package ru.kbats183.youtube.broadcastscheduler
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.encodeToStream
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import org.litote.kmongo.coroutine.CoroutineDatabase
+import org.litote.kmongo.coroutine.coroutine
+import org.litote.kmongo.reactivestreams.KMongo
+import ru.kbats.youtube.broadcastscheduler.Config
+import ru.kbats.youtube.broadcastscheduler.data.Admin
 
-@Serializable
-data class Repository(val streams: MutableList<Stream>, val course: MutableList<Course>)
-
-const val repositoryFileName = "repository.json"
-
-@OptIn(ExperimentalSerializationApi::class)
-fun loadRepository(): Repository {
-    return FileInputStream(repositoryFileName).buffered().use {
-        return@use Json.decodeFromStream<Repository>(it)
+class Repository(val db: CoroutineDatabase) {
+    suspend fun getUser(): List<Admin> {
+        return db.getCollection<Admin>().find().toList()
     }
 }
 
-@OptIn(ExperimentalSerializationApi::class)
-fun Repository.store() {
-    FileOutputStream("repository.json").buffered().use {
-        Json.encodeToStream(this, it)
-    }
+fun getRepository(config: Config): Repository {
+    val client = KMongo.createClient(config.mongoDBConnectionString).coroutine
+    val db = client.getDatabase(config.mongoDBBase)
+    return Repository(db)
 }

@@ -57,6 +57,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.0")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.7")
+    implementation("org.litote.kmongo:kmongo-coroutine:4.7.1")
     compile("com.google.api-client:google-api-client:1.31.5")
     compile("com.google.apis:google-api-services-youtube:v3-rev182-1.22.0")
     compile("com.google.http-client:google-http-client-jackson2:1.20.0")

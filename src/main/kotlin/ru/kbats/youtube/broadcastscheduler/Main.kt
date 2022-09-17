@@ -2,12 +2,7 @@ package ru.kbats.youtube.broadcastscheduler
 
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
-import com.github.kotlintelegrambot.dispatcher.Dispatcher
-import com.github.kotlintelegrambot.dispatcher.callbackQuery
 import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
-import com.github.kotlintelegrambot.dispatcher.handlers.HandleCallbackQuery
-import com.github.kotlintelegrambot.dispatcher.handlers.HandleText
-import com.github.kotlintelegrambot.dispatcher.text
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
@@ -18,17 +13,18 @@ import ru.kbats.youtube.broadcastscheduler.states.BotUserState
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
 import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
 import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
+import ru.kbats183.youtube.broadcastscheduler.getRepository
 
 class Application(private val config: Config) {
     private val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)
-    private val admins = listOf(316671439L)
+    private val repository = getRepository(config)
     private val userStates = UserStateStorage()
 
     fun run() {
         val bot = bot {
             token = config.botApiToken
             dispatch {
-                withAdminRight {
+                withAdminRight(repository) {
                     text {
                         when (userStates[message.chat.id]) {
                             is BotUserState.CreatingNewLiveStream -> {
@@ -194,28 +190,6 @@ class Application(private val config: Config) {
             "Manage: https://studio.youtube.com/video/${id}/livestreaming"
 
 
-    private class AdminDispatcher(val admins: List<Long>, val dispatcher: Dispatcher) {
-        fun text(text: String? = null, handleText: HandleText) {
-            dispatcher.text(text) {
-                if (admins.contains(message.from?.id)) {
-                    handleText()
-                }
-            }
-        }
-
-        fun callbackQuery(data: String? = null, handleCallbackQuery: HandleCallbackQuery) {
-            dispatcher.callbackQuery(data) {
-                if (admins.contains(callbackQuery.from.id)) {
-                    handleCallbackQuery()
-                }
-            }
-        }
-    }
-
-    private fun Dispatcher.withAdminRight(body: AdminDispatcher.() -> Unit) {
-        AdminDispatcher(admins, this).body()
-    }
-
     companion object {
         private fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
             "complete" -> "☑️"
@@ -336,18 +310,4 @@ fun main() {
     val application = Application(config())
     println("Hello!")
     application.run()
-//    println(youtubeApi.createLiveStram("Aboba"))
-//    youtubeApi.getLiveStreams()
-//    val repo = loadRepository()
-//    repo.course += Course(
-//        "y2020.M32367.MathAn",
-//        LocalDateTime(2022, 2, 21, 11, 40, 0),
-//        "[s4 | 2022] Математический анализ, О. Л. Семенова, лекция {number}",
-//        "aboba",
-//        4,
-//        1,
-//        "dsfsa"
-//
-//    )
-//    repo.store()
 }

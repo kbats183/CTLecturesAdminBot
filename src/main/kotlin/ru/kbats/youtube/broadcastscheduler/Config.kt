@@ -1,8 +1,15 @@
 package ru.kbats.youtube.broadcastscheduler
 
-class Config(val botApiToken: String)
+data class Config(
+    val botApiToken: String,
+    val mongoDBConnectionString: String,
+    val mongoDBBase: String,
+)
 
 fun config(): Config {
-    val botApiToken = System.getenv("BOT_TOKEN")
-    return Config(botApiToken)
+    return Config(
+        System.getenv("BOT_TOKEN"),
+        System.getenv("MONGO"),
+        System.getenv("MONGO_BASE"),
+    )
 }
