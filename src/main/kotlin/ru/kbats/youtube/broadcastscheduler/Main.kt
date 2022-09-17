@@ -10,6 +10,7 @@ import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
 import ru.kbats.youtube.broadcastscheduler.bot.setupDispatcher
+import ru.kbats.youtube.broadcastscheduler.data.Lecture
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
 import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
 import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
@@ -57,6 +58,8 @@ class Application(private val config: Config) {
 
 
     companion object {
+        const val thumbnailsDirectory = "thumbnails"
+
         private fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
             "complete" -> "☑️"
             "live" -> "\uD83D\uDFE2"
@@ -70,6 +73,7 @@ class Application(private val config: Config) {
             val mainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
                 InlineKeyboardButton.CallbackData("Streams", "LiveStreamsCmd"),
                 InlineKeyboardButton.CallbackData("Broadcasts", "BroadcastsCmd"),
+                InlineKeyboardButton.CallbackData("Lectures", "LecturesCmd"),
             )
             val streamsMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
                 InlineKeyboardButton.CallbackData("List", "LiveStreamsListCmd"),
@@ -85,7 +89,13 @@ class Application(private val config: Config) {
             private fun gridNav(
                 commandPrefix: String,
                 items: List<Pair<String, String>>,
-                itemsPerRow: Int = 4
+                itemsPerRow: Int = 4,
+                lastRow: List<InlineKeyboardButton> = mutableListOf(
+                    InlineKeyboardButton.CallbackData(
+                        "Hide",
+                        "HideCallbackMessageCmd"
+                    )
+                )
             ): InlineKeyboardMarkup {
                 return InlineKeyboardMarkup.create(items.map {
                     InlineKeyboardButton.CallbackData(
@@ -96,7 +106,7 @@ class Application(private val config: Config) {
                     (rows.lastOrNull()?.takeIf { it.size < itemsPerRow }
                         ?: mutableListOf<InlineKeyboardButton>().also { rows += it }) += it
                     return@fold rows
-                } + mutableListOf(mutableListOf(InlineKeyboardButton.CallbackData("Hide", "HideCallbackMessageCmd"))))
+                } + listOf(lastRow))
             }
 
             fun streamsNav(liveStreams: List<LiveStream>) =
@@ -165,6 +175,41 @@ class Application(private val config: Config) {
                         )
                     )
                 )
+                return InlineKeyboardMarkup.create(buttons)
+            }
+
+            fun lecturesNav(lectures: List<Lecture>) =
+                gridNav(
+                    "LecturesItemCmd", lectures.map { it.id.toString() to it.name },
+                    lastRow = listOf(
+                        InlineKeyboardButton.CallbackData("New", "LecturesNewCmd"),
+                        InlineKeyboardButton.CallbackData("Refresh", "LecturesRefreshCmd"),
+                        InlineKeyboardButton.CallbackData("Hide", "HideCallbackMessageCmd"),
+                    )
+                )
+
+
+            fun lectureManage(lecture: Lecture): InlineKeyboardMarkup {
+                val buttons = mutableListOf<List<InlineKeyboardButton>>(
+                    listOf(
+                        InlineKeyboardButton.CallbackData("Refresh", "LecturesItemRefreshCmd${lecture.id}"),
+                        InlineKeyboardButton.CallbackData("Hide", "HideCallbackMessageCmd")
+                    ),
+                    listOf(
+                        InlineKeyboardButton.CallbackData("Previous number", "LecturesItemPrevNumberCmd${lecture.id}"),
+                        InlineKeyboardButton.CallbackData("Next number", "LecturesItemNextNumberCmd${lecture.id}")
+                    )
+                )
+                if (lecture.thumbnails != null) {
+                    buttons.add(
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                "Thumbnails",
+                                "LecturesItemThumbnailsCmd${lecture.id}"
+                            ),
+                        )
+                    )
+                }
                 return InlineKeyboardMarkup.create(buttons)
             }
         }

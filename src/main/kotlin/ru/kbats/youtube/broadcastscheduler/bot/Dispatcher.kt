@@ -1,9 +1,40 @@
 package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.github.kotlintelegrambot.dispatcher.Dispatcher
+import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.TelegramFile
 import ru.kbats.youtube.broadcastscheduler.Application
+import ru.kbats.youtube.broadcastscheduler.data.Lecture
+import ru.kbats.youtube.broadcastscheduler.data.LectureType
 import ru.kbats.youtube.broadcastscheduler.states.BotUserState
+import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
+import kotlin.io.path.Path
+
+private fun Lecture.infoMessage(): String = "Lecture ${name}\n" +
+        "Title: ${currentTitle()}\n" +
+        "Description: ${description}\n" +
+        "Lecture type: ${lectureType}\n" +
+        "Lecture numeration: ${if (doubleNumeration) "double" else "single"}\n" +
+        ""
+
+private fun Lecture.currentTitle(): String {
+    val numbers =
+        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
+    return "$title, " + when (lectureType) {
+        LectureType.Lecture -> if (doubleNumeration) "лекции" else "лекция"
+        LectureType.Practice -> if (doubleNumeration) "практики" else "практика"
+    } + " " + numbers
+}
+
+private fun Lecture.currentThumbnailLecture(): String {
+    val numbers =
+        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
+    return when (lectureType) {
+        LectureType.Lecture -> "L"
+        LectureType.Practice -> "P"
+    } + numbers
+}
 
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(repository) {
@@ -144,6 +175,78 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                 text = item.infoMessage(),
                 replyMarkup = Application.Companion.InlineButtons.broadcastManage(item)
             )
+        }
+        callbackQuery("LecturesCmd") {
+            bot.sendMessage(
+                ChatId.fromId(callbackQuery.from.id), text = "Lectures",
+                replyMarkup = Application.Companion.InlineButtons.lecturesNav(repository.getLectures())
+            )
+        }
+        callbackQuery("LecturesRefreshCmd") {
+            bot.editMessageText(
+                chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
+                messageId = callbackQuery.message?.messageId,
+                text = "Lectures",
+                replyMarkup = Application.Companion.InlineButtons.lecturesNav(repository.getLectures()),
+            )
+        }
+        callbackQuery("LecturesItemCmd") {
+            val id = callbackQueryId("LecturesItemCmd") ?: return@callbackQuery
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            bot.sendMessage(
+                ChatId.fromId(callbackQuery.from.id), text = lecture.infoMessage(),
+                replyMarkup = Application.Companion.InlineButtons.lectureManage(lecture)
+            )
+        }
+        fun CallbackQueryHandlerEnvironment.editLectureMessage(lecture: Lecture) {
+            bot.editMessageText(
+                chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
+                messageId = callbackQuery.message?.messageId,
+                text = lecture.infoMessage(),
+                replyMarkup = Application.Companion.InlineButtons.lectureManage(lecture)
+            )
+        }
+        callbackQuery("LecturesItemRefreshCmd") {
+            val id = callbackQueryId("LecturesItemRefreshCmd") ?: return@callbackQuery
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            editLectureMessage(lecture)
+        }
+        callbackQuery("LecturesItemPrevNumberCmd") {
+            val id = callbackQueryId("LecturesItemPrevNumberCmd") ?: return@callbackQuery
+            repository.updateLecture(id) { it.copy(currentLectureNumber = it.currentLectureNumber - 1) }
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            editLectureMessage(lecture)
+        }
+        callbackQuery("LecturesItemNextNumberCmd") {
+            val id = callbackQueryId("LecturesItemNextNumberCmd") ?: return@callbackQuery
+            repository.updateLecture(id) { it.copy(currentLectureNumber = it.currentLectureNumber + 1) }
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            editLectureMessage(lecture)
+        }
+        callbackQuery("LecturesItemThumbnailsCmd") {
+            val id = callbackQueryId("LecturesItemThumbnailsCmd") ?: return@callbackQuery
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            if (lecture.thumbnails == null) {
+                bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "No thumbnails info")
+                return@callbackQuery
+            }
+
+            val generatingMessage = bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Generating ...")
+            try {
+                val generateFile = Thumbnail.generate(
+                    Path(Application.thumbnailsDirectory),
+                    lecture.thumbnails,
+                    lecture.currentThumbnailLecture()
+                )
+                bot.sendDocument(
+                    ChatId.fromId(callbackQuery.from.id),
+                    TelegramFile.ByFile(generateFile),
+                )
+                bot.deleteMessage(ChatId.fromId(callbackQuery.from.id), generatingMessage.get().messageId)
+            } catch (e: Throwable) {
+                println(e.message ?: e::class.java.name)
+                bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = e.message ?: e::class.java.name)
+            }
         }
     }
 }

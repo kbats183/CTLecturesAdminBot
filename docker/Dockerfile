@@ -1,4 +1,4 @@
-FROM openjdk:17-alpine AS jre-build
+FROM openjdk:17
 
 WORKDIR /app
 COPY . .

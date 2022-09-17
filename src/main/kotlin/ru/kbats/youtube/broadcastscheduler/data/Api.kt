@@ -26,14 +26,18 @@ data class LectureBroadcastScheduling(
     val enableAutoStop: Boolean,
 )
 
+enum class LectureType {
+    Lecture, Practice
+}
+
 data class Lecture(
-    @BsonId val id: Id<Lecture> = newId(),
     val name: String,
     val title: String,
     val description: String,
     val currentLectureNumber: Int,
-    val isDoubleNumeration: Boolean,
-    val lectureNumberPrefix: String = "L",
-    val thumbnails: LectureThumbnails?,
-    val scheduling: LectureBroadcastScheduling?,
+    val doubleNumeration: Boolean,
+    val lectureType: LectureType = LectureType.Lecture,
+    val thumbnails: LectureThumbnails? = null,
+    val scheduling: LectureBroadcastScheduling? = null,
+    @BsonId val id: Id<Lecture> = newId(),
 )

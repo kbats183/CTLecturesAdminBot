@@ -62,7 +62,7 @@ dependencies {
     compile("com.google.apis:google-api-services-youtube:v3-rev182-1.22.0")
     compile("com.google.http-client:google-http-client-jackson2:1.20.0")
     compile("com.google.oauth-client:google-oauth-client-jetty:1.20.0")
-    implementation("org.apache.xmlgraphics:xmlgraphics-commons:2.7")
-    implementation("org.apache.xmlgraphics:batik-transcoder:1.14")
-    implementation("org.apache.xmlgraphics:batik-codec:1.14")
+//    implementation("org.apache.xmlgraphics:xmlgraphics-commons:2.7")
+//    implementation("org.apache.xmlgraphics:batik-transcoder:1.14")
+//    implementation("org.apache.xmlgraphics:batik-codec:1.14")
 }
