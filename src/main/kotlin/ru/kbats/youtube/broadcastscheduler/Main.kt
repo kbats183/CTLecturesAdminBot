@@ -3,184 +3,50 @@ package ru.kbats.youtube.broadcastscheduler
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
-import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
-import ru.kbats.youtube.broadcastscheduler.states.BotUserState
+import ru.kbats.youtube.broadcastscheduler.bot.setupDispatcher
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
 import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
 import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
-import ru.kbats183.youtube.broadcastscheduler.getRepository
 
 class Application(private val config: Config) {
-    private val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)
-    private val repository = getRepository(config)
-    private val userStates = UserStateStorage()
+    internal val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)
+    internal val repository = getRepository(config)
+    internal val userStates = UserStateStorage()
 
     fun run() {
         val bot = bot {
             token = config.botApiToken
             dispatch {
-                withAdminRight(repository) {
-                    text {
-                        when (userStates[message.chat.id]) {
-                            is BotUserState.CreatingNewLiveStream -> {
-                                val newLiveStream = youtubeApi.createStream(text)
-                                bot.sendMessage(ChatId.fromId(message.chat.id), newLiveStream.infoMessage())
-                                userStates[message.chat.id] = BotUserState.Default
-                            }
-                            else -> {
-                                bot.sendMessage(
-                                    ChatId.fromId(message.chat.id), text = "Main menu",
-                                    replyMarkup = InlineButtons.mainMenu,
-                                )
-                            }
-                        }
+                message {
+                    message.document?.let {
+                        bot.downloadFile(it.fileId).first
                     }
-                    callbackQuery("HideCallbackMessageCmd") {
-                        bot.deleteMessage(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) } ?: return@callbackQuery,
-                            messageId = callbackQuery.message?.messageId ?: return@callbackQuery,
-                        )
-                    }
-                    callbackQuery("LiveStreamsCmd") {
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id),
-                            text = "LiveStreams",
-                            replyMarkup = InlineButtons.streamsMenu,
-                        )
-                    }
-                    callbackQuery("LiveStreamsNewCmd") {
-                        bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Enter name of new stream")
-                        userStates[callbackQuery.from.id] = BotUserState.CreatingNewLiveStream
-                    }
-                    callbackQuery("LiveStreamsListCmd") {
-                        val liveStreams = youtubeApi.getStreams()
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id), text = "List of streams",
-                            replyMarkup = InlineButtons.streamsNav(liveStreams)
-                        )
-                    }
-                    callbackQuery("LiveStreamsItemCmd") {
-                        val id = callbackQueryId("LiveStreamsItemCmd") ?: return@callbackQuery
-                        val stream = youtubeApi.getStream(id)
-                        if (stream == null) {
-                            bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Stream not found")
-                            return@callbackQuery
-                        }
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id),
-                            text = stream.infoMessage(),
-                            replyMarkup = InlineButtons.streamManage(stream)
-                        )
-                    }
-                    callbackQuery("LiveStreamsItemRefreshCmd") {
-                        val id = callbackQueryId("LiveStreamsItemRefreshCmd") ?: return@callbackQuery
-                        val stream = youtubeApi.getStream(id) ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = stream.infoMessage(),
-                            replyMarkup = InlineButtons.streamManage(stream)
-                        )
-                    }
-                    callbackQuery("BroadcastsCmd") {
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id), text = "Broadcasts",
-                            replyMarkup = InlineButtons.broadcastsMenu
-                        )
-                    }
-                    callbackQuery("BroadcastsActiveCmd") {
-                        val broadcasts = youtubeApi.getBroadcasts("active") + youtubeApi.getBroadcasts("upcoming")
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id), text = "Active and upcoming broadcasts",
-                            replyMarkup = InlineButtons.broadcastsNav(broadcasts)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemCmd") {
-                        val id = callbackQueryId("BroadcastsItemCmd") ?: return@callbackQuery
-                        val item = youtubeApi.getBroadcast(id)
-                        if (item == null) {
-                            bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Broadcast not found")
-                            return@callbackQuery
-                        }
-                        bot.sendMessage(
-                            ChatId.fromId(callbackQuery.from.id),
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemRefreshCmd") {
-                        val id = callbackQueryId("BroadcastsItemRefreshCmd") ?: return@callbackQuery
-                        val item = youtubeApi.getBroadcast(id) ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemStartCmd") {
-                        val id = callbackQueryId("BroadcastsItemStartCmd") ?: return@callbackQuery
-                        val item = youtubeApi.getBroadcast(id) ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item, confirmStart = true)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemStartConfirmCmd") {
-                        val id = callbackQueryId("BroadcastsItemStartConfirmCmd") ?: return@callbackQuery
-                        val item = youtubeApi.transitionBroadcast(id, "live") ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemStopCmd") {
-                        val id = callbackQueryId("BroadcastsItemStopCmd") ?: return@callbackQuery
-                        val item = youtubeApi.getBroadcast(id) ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item, confirmStop = true)
-                        )
-                    }
-                    callbackQuery("BroadcastsItemStopConfirmCmd") {
-                        val id = callbackQueryId("BroadcastsItemStopConfirmCmd") ?: return@callbackQuery
-                        val item = youtubeApi.transitionBroadcast(id, "complete") ?: return@callbackQuery
-                        bot.editMessageText(
-                            chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
-                            messageId = callbackQuery.message?.messageId,
-                            text = item.infoMessage(),
-                            replyMarkup = InlineButtons.broadcastManage(item)
-                        )
-                    }
+                    println("${message.document}")
                 }
+                setupDispatcher(this)
             }
         }
         bot.startPolling()
     }
 
-    private fun CallbackQueryHandlerEnvironment.callbackQueryId(commandPrefix: String): String? {
+    internal fun CallbackQueryHandlerEnvironment.callbackQueryId(commandPrefix: String): String? {
         if (callbackQuery.data.startsWith(commandPrefix)) {
             return callbackQuery.data.substring(commandPrefix.length)
         }
         return null
     }
 
-    private fun LiveStream.infoMessage() = "Live Stream " + snippet.title + "\n" + cdn.ingestionInfo.streamName +
+    internal fun LiveStream.infoMessage() = "Live Stream " + snippet.title + "\n" + cdn.ingestionInfo.streamName +
             (status?.let { "\n" + "Status: " + it.streamStatus + ", " + it.healthStatus.status }
                 ?: "")
 
-    private fun LiveBroadcast.infoMessage(): String = "Broadcast ${snippet.title}\n" +
+    fun LiveBroadcast.infoMessage(): String = "Broadcast ${snippet.title}\n" +
             "Start time: ${snippet.actualStartTime ?: snippet.scheduledStartTime}\n" +
             "End time: ${snippet.actualEndTime ?: snippet.scheduledEndTime}\n" +
             "Status: ${status.emojy()}${status.lifeCycleStatus}\n" +

@@ -13,7 +13,7 @@ data class LectureThumbnails(
 )
 
 enum class LectureBroadcast {
-    Public, ByLink
+    Public, LinkOnly
 }
 
 data class LectureBroadcastScheduling(

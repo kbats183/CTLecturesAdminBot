@@ -1,9 +1,8 @@
-package ru.kbats183.youtube.broadcastscheduler
+package ru.kbats.youtube.broadcastscheduler
 
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
-import ru.kbats.youtube.broadcastscheduler.Config
 import ru.kbats.youtube.broadcastscheduler.data.Admin
 
 class Repository(val db: CoroutineDatabase) {

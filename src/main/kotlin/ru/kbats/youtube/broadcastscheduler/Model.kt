@@ -1,4 +1,4 @@
-package ru.kbats183.youtube.broadcastscheduler
+package ru.kbats.youtube.broadcastscheduler
 
 import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable

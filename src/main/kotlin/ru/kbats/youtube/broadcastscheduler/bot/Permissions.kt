@@ -1,4 +1,4 @@
-package ru.kbats.youtube.broadcastscheduler
+package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.github.kotlintelegrambot.dispatcher.Dispatcher
 import com.github.kotlintelegrambot.dispatcher.callbackQuery
@@ -6,7 +6,7 @@ import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvi
 import com.github.kotlintelegrambot.dispatcher.handlers.TextHandlerEnvironment
 import com.github.kotlintelegrambot.dispatcher.text
 import kotlinx.coroutines.runBlocking
-import ru.kbats183.youtube.broadcastscheduler.Repository
+import ru.kbats.youtube.broadcastscheduler.Repository
 
 typealias HandleTextSuspend = suspend TextHandlerEnvironment.() -> Unit
 typealias HandleCallbackQuery = suspend CallbackQueryHandlerEnvironment.() -> Unit
