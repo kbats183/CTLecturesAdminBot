@@ -1,15 +1,18 @@
 package ru.kbats.youtube.broadcastscheduler.youtube
 
 import com.google.api.client.auth.oauth2.Credential
+import com.google.api.client.http.FileContent
+import com.google.api.client.util.DateTime
 import com.google.api.services.youtube.YouTube
-import com.google.api.services.youtube.model.CdnSettings
-import com.google.api.services.youtube.model.LiveBroadcast
-import com.google.api.services.youtube.model.LiveStream
-import com.google.api.services.youtube.model.LiveStreamSnippet
+import com.google.api.services.youtube.model.*
+import kotlinx.datetime.Instant
+import ru.kbats.youtube.broadcastscheduler.data.LectureBroadcastPrivacy
+import java.io.File
 import java.io.IOException
+import java.util.*
+import kotlin.time.Duration.Companion.hours
 
-class YoutubeApi(private val credential: Credential) {
-    // This object is used to make YouTube Data API requests.
+class YoutubeApi(credential: Credential) {
     private val youtube = YouTube.Builder(Auth.HTTP_TRANSPORT, Auth.JSON_FACTORY, credential)
         .setApplicationName("youtube-cmdline-createbroadcast-sample").build()
 
@@ -64,5 +67,38 @@ class YoutubeApi(private val credential: Credential) {
      */
     fun transitionBroadcast(id: String, newStatus: String): LiveBroadcast? {
         return youtube.liveBroadcasts().transition(newStatus, id, "id,snippet,contentDetails,status").execute()
+    }
+
+    fun createBroadcast(
+        title: String,
+        description: String,
+        startTime: Instant,
+        endTime: Instant = startTime + 2.hours,
+        privacy: LectureBroadcastPrivacy,
+    ): LiveBroadcast? {
+        val broadcastSnippet = LiveBroadcastSnippet()
+        broadcastSnippet.title = title
+        broadcastSnippet.description = description
+        broadcastSnippet.scheduledStartTime = DateTime(startTime.toEpochMilliseconds())
+        broadcastSnippet.scheduledEndTime = DateTime(endTime.toEpochMilliseconds())
+
+        val status = LiveBroadcastStatus()
+        status.privacyStatus = privacy.name.lowercase(Locale.getDefault())
+
+        val broadcast = LiveBroadcast()
+        broadcast.kind = "youtube#liveBroadcast"
+        broadcast.snippet = broadcastSnippet
+        broadcast.status = status
+
+        return youtube.liveBroadcasts().insert("snippet,status", broadcast).execute()
+    }
+
+    fun uploadBroadcastThumbnail(broadcastId: String, thumbnailPngFile: File): ThumbnailSetResponse? {
+        return youtube.thumbnails().set(broadcastId, FileContent("image/png", thumbnailPngFile)).execute()
+    }
+
+    fun bindBroadcastStream(broadcastId: String, stramId: String): LiveBroadcast? {
+        return youtube.liveBroadcasts().bind(broadcastId, "id,snippet,contentDetails,status")
+            .setStreamId(stramId).execute()
     }
 }

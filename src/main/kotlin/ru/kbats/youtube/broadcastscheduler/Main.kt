@@ -6,6 +6,7 @@ import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvi
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
+import com.github.kotlintelegrambot.logging.LogLevel
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
@@ -22,6 +23,7 @@ class Application(private val config: Config) {
 
     fun run() {
         val bot = bot {
+            logLevel = LogLevel.Error
             token = config.botApiToken
             dispatch {
                 message {
@@ -43,17 +45,19 @@ class Application(private val config: Config) {
         return null
     }
 
-    internal fun LiveStream.infoMessage() = "Live Stream " + snippet.title + "\n" + cdn.ingestionInfo.streamName +
-            (status?.let { "\n" + "Status: " + it.streamStatus + ", " + it.healthStatus.status }
-                ?: "")
+    internal fun LiveStream.infoMessage() = "Live Stream ${snippet.title}\n" +
+            "Stream id: ${id}\n" +
+            "OBS key: " + cdn.ingestionInfo.streamName +
+            (status?.let { "\nStatus: ${it.streamStatus}, ${it.healthStatus.status}" } ?: "")
 
     fun LiveBroadcast.infoMessage(): String = "Broadcast ${snippet.title}\n" +
             "Start time: ${snippet.actualStartTime ?: snippet.scheduledStartTime}\n" +
             "End time: ${snippet.actualEndTime ?: snippet.scheduledEndTime}\n" +
             "Status: ${status.emojy()}${status.lifeCycleStatus}\n" +
             "Privacy: ${status.privacyStatus}\n" +
-            "Thumbnails: ${snippet.thumbnails.maxres.url}\n" +
+            "Thumbnails: ${snippet.thumbnails?.maxres?.url?.withUpdateUrlSuffix() ?: "no"}\n" +
 //                    "StramID: ${contentDetails.boundStreamId}\n" +
+            "View: https://www.youtube.com/watch?v=${id}\n" +
             "Manage: https://studio.youtube.com/video/${id}/livestreaming"
 
 
@@ -140,12 +144,26 @@ class Application(private val config: Config) {
                     )
                 )
                 buttons.addIf(
-                    broadcast.contentDetails.boundStreamId != null, listOf(
-                        InlineKeyboardButton.CallbackData(
-                            "Bound stream",
-                            "LiveStreamsItemCmd${broadcast.contentDetails.boundStreamId}"
+                    broadcast.contentDetails?.boundStreamId != null,
+                    if (broadcast.status.lifeCycleStatus == "ready") {
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                "Bound stream",
+                                "LiveStreamsItemCmd${broadcast.contentDetails?.boundStreamId}"
+                            ),
+                            InlineKeyboardButton.CallbackData(
+                                "Test and start",
+                                "BroadcastsItemTestCmd${broadcast.id}"
+                            )
                         )
-                    )
+                    } else {
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                "Bound stream",
+                                "LiveStreamsItemCmd${broadcast.contentDetails?.boundStreamId}"
+                            )
+                        )
+                    }
                 )
                 buttons.addIf(
                     broadcast.status.lifeCycleStatus == "testing" && !confirmStart, listOf(
@@ -200,13 +218,18 @@ class Application(private val config: Config) {
                         InlineKeyboardButton.CallbackData("Next number", "LecturesItemNextNumberCmd${lecture.id}")
                     )
                 )
+
+                fun addOne(callbackData: InlineKeyboardButton.CallbackData) {
+                    buttons.add(listOf(callbackData))
+                }
                 if (lecture.thumbnails != null) {
-                    buttons.add(
-                        listOf(
-                            InlineKeyboardButton.CallbackData(
-                                "Thumbnails",
-                                "LecturesItemThumbnailsCmd${lecture.id}"
-                            ),
+                    addOne(InlineKeyboardButton.CallbackData("Thumbnails", "LecturesItemThumbnailsCmd${lecture.id}"))
+                }
+                if (lecture.scheduling != null) {
+                    addOne(
+                        InlineKeyboardButton.CallbackData(
+                            "Schedule broadcast",
+                            "LecturesItemSchedulingCmd${lecture.id}"
                         )
                     )
                 }
@@ -218,6 +241,8 @@ class Application(private val config: Config) {
 
 
 fun main() {
+//    println("${Clock.System.now().epochSeconds}")
+//    println("${Clock.System.now().toLocalDateTime(timeZone)}")
     val application = Application(config())
     println("Hello!")
     application.run()

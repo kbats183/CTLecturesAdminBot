@@ -1,12 +1,13 @@
 package ru.kbats.youtube.broadcastscheduler.bot
 
+import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.dispatcher.Dispatcher
 import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.TelegramFile
 import ru.kbats.youtube.broadcastscheduler.Application
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
-import ru.kbats.youtube.broadcastscheduler.data.LectureType
 import ru.kbats.youtube.broadcastscheduler.states.BotUserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import kotlin.io.path.Path
@@ -17,24 +18,6 @@ private fun Lecture.infoMessage(): String = "Lecture ${name}\n" +
         "Lecture type: ${lectureType}\n" +
         "Lecture numeration: ${if (doubleNumeration) "double" else "single"}\n" +
         ""
-
-private fun Lecture.currentTitle(): String {
-    val numbers =
-        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
-    return "$title, " + when (lectureType) {
-        LectureType.Lecture -> if (doubleNumeration) "лекции" else "лекция"
-        LectureType.Practice -> if (doubleNumeration) "практики" else "практика"
-    } + " " + numbers
-}
-
-private fun Lecture.currentThumbnailLecture(): String {
-    val numbers =
-        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
-    return when (lectureType) {
-        LectureType.Lecture -> "L"
-        LectureType.Practice -> "P"
-    } + numbers
-}
 
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(repository) {
@@ -129,6 +112,16 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
         callbackQuery("BroadcastsItemRefreshCmd") {
             val id = callbackQueryId("BroadcastsItemRefreshCmd") ?: return@callbackQuery
             val item = youtubeApi.getBroadcast(id) ?: return@callbackQuery
+            bot.editMessageText(
+                chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
+                messageId = callbackQuery.message?.messageId,
+                text = item.infoMessage(),
+                replyMarkup = Application.Companion.InlineButtons.broadcastManage(item)
+            )
+        }
+        callbackQuery("BroadcastsItemTestCmd") {
+            val id = callbackQueryId("BroadcastsItemTestCmd") ?: return@callbackQuery
+            val item = youtubeApi.transitionBroadcast(id, "testing") ?: return@callbackQuery
             bot.editMessageText(
                 chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) },
                 messageId = callbackQuery.message?.messageId,
@@ -242,11 +235,37 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                     ChatId.fromId(callbackQuery.from.id),
                     TelegramFile.ByFile(generateFile),
                 )
-                bot.deleteMessage(ChatId.fromId(callbackQuery.from.id), generatingMessage.get().messageId)
+                generatingMessage.getOrNull()?.delete(bot)
             } catch (e: Throwable) {
                 println(e.message ?: e::class.java.name)
                 bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = e.message ?: e::class.java.name)
             }
         }
+        callbackQuery("LecturesItemSchedulingCmd") {
+            val id = callbackQueryId("LecturesItemSchedulingCmd") ?: return@callbackQuery
+            val lecture = repository.getLecture(id) ?: return@callbackQuery
+            if (lecture.scheduling == null) {
+                bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "No scheduling info")
+                return@callbackQuery
+            }
+            val schedulingMessage = bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Scheduling ...")
+            val scheduledStream = scheduleStream(lecture)
+            if (scheduledStream == null) {
+                schedulingMessage.getOrNull()?.delete(bot)
+                bot.sendMessage(ChatId.fromId(callbackQuery.from.id), "Failed to schedule stream")
+                return@callbackQuery
+            }
+            schedulingMessage.getOrNull()?.delete(bot)
+            bot.sendMessage(
+                ChatId.fromId(callbackQuery.from.id),
+                text = scheduledStream.infoMessage(),
+                replyMarkup = Application.Companion.InlineButtons.broadcastManage(scheduledStream)
+            )
+        }
+
     }
+}
+
+private fun Message.delete(bot: Bot) {
+    bot.deleteMessage(ChatId.fromId(this.chat.id), this.messageId)
 }
