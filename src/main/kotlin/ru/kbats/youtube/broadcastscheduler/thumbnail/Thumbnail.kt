@@ -54,6 +54,7 @@ object Thumbnail {
                     "capri" -> "00ccff"
                     "bluetiful" -> "0b68fe"
                     "violet" -> "7f00ff"
+                    "pink" -> "fc74fd"
                     else -> string
                 }
             )
