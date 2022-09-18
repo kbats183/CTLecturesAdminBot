@@ -22,6 +22,16 @@ private fun Lecture.infoMessage(): String = "Lecture ${name}\n" +
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(repository) {
         text {
+            if (text.startsWith("/addAdmin")) {
+                val components = text.split("\n")
+                if (components.size != 3) {
+                    bot.sendMessage(ChatId.fromId(message.chat.id), "Incorrect input")
+                    return@text
+                }
+                repository.addAdmin(components[1], components[2])
+                bot.sendMessage(ChatId.fromId(message.chat.id), "Ok")
+                return@text
+            }
             when (userStates[message.chat.id]) {
                 is BotUserState.CreatingNewLiveStream -> {
                     val newLiveStream = youtubeApi.createStream(text)

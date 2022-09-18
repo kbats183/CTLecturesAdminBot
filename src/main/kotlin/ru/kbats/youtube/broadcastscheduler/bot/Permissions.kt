@@ -16,7 +16,8 @@ class AdminDispatcher(private val repository: Repository, private val dispatcher
     fun text(text: String? = null, handleText: HandleTextSuspend) {
         dispatcher.text(text) {
             runBlocking {
-                if (repository.getUser().any { it.login == message.from?.username}) {
+                if (repository.getAdmins().any { it.login == message.from?.username }) {
+                    println("User ${message.chat.username} send text `${message.text}`")
                     handleText()
                 }
             }
@@ -26,7 +27,11 @@ class AdminDispatcher(private val repository: Repository, private val dispatcher
     fun callbackQuery(data: String? = null, handleCallbackQuery: HandleCallbackQuery) {
         dispatcher.callbackQuery(data) {
             runBlocking {
-                if (repository.getUser().any { it.login == callbackQuery.from.username }) {
+                if (repository.getAdmins().any { it.login == callbackQuery.from.username }) {
+                    println(
+                        "User ${callbackQuery.from.username} send callback ${callbackQuery.data} from message " +
+                                "`${callbackQuery.message?.text?.substring(0..50)}`"
+                    )
                     handleCallbackQuery()
                 }
             }

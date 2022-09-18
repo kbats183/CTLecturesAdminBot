@@ -9,8 +9,12 @@ import ru.kbats.youtube.broadcastscheduler.data.Admin
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
 
 class Repository(val db: CoroutineDatabase) {
-    suspend fun getUser(): List<Admin> {
+    suspend fun getAdmins(): List<Admin> {
         return db.getCollection<Admin>().find().toList()
+    }
+
+    suspend fun addAdmin(login: String, commentary: String) {
+        db.getCollection<Admin>().insertOne(Admin(login = login, comment = commentary))
     }
 
     suspend fun getLectures(): List<Lecture> {
