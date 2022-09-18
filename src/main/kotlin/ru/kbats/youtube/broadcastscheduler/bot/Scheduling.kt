@@ -10,7 +10,7 @@ import kotlin.io.path.Path
 
 fun Lecture.currentThumbnailLecture(): String {
     val numbers =
-        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
+        if (doubleNumeration) "$currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
     return when (lectureType) {
         LectureType.Lecture -> "L"
         LectureType.Practice -> "P"
