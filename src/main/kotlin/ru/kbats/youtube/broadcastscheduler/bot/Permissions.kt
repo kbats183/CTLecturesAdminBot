@@ -7,6 +7,7 @@ import com.github.kotlintelegrambot.dispatcher.handlers.TextHandlerEnvironment
 import com.github.kotlintelegrambot.dispatcher.text
 import kotlinx.coroutines.runBlocking
 import ru.kbats.youtube.broadcastscheduler.Repository
+import java.lang.Integer.min
 
 typealias HandleTextSuspend = suspend TextHandlerEnvironment.() -> Unit
 typealias HandleCallbackQuery = suspend CallbackQueryHandlerEnvironment.() -> Unit
@@ -30,7 +31,7 @@ class AdminDispatcher(private val repository: Repository, private val dispatcher
                 if (repository.getAdmins().any { it.login == callbackQuery.from.username }) {
                     println(
                         "User ${callbackQuery.from.username} send callback ${callbackQuery.data} from message " +
-                                "`${callbackQuery.message?.text?.substring(0..50)}`"
+                                "`${callbackQuery.message?.text?.let { it.substring(0, min(50, it.length)) }}`"
                     )
                     handleCallbackQuery()
                 }

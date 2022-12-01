@@ -19,7 +19,7 @@ fun Lecture.currentThumbnailLecture(): String {
 
 fun Lecture.currentTitle(): String {
     val numbers =
-        if (doubleNumeration) " $currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
+        if (doubleNumeration) "$currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
     return "$title, " + when (lectureType) {
         LectureType.Lecture -> if (doubleNumeration) "лекции" else "лекция"
         LectureType.Practice -> if (doubleNumeration) "практики" else "практика"

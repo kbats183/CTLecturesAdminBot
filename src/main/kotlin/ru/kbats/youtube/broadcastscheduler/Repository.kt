@@ -18,7 +18,7 @@ class Repository(val db: CoroutineDatabase) {
     }
 
     suspend fun getLectures(): List<Lecture> {
-        return db.getCollection<Lecture>().find().toList()
+        return db.getCollection<Lecture>().find().toList().sortedBy { it.name }
     }
 
     suspend fun getLecture(id: String): Lecture? {
