@@ -19,7 +19,7 @@ object Thumbnail {
     fun generate(templateDir: Path, thumbnails: LectureThumbnails, lectureTitleNumber: String): File {
         val thumbnailsPath = templateDir.resolve(thumbnails.fileName)
         if (!thumbnailsPath.isReadable()) {
-            throw ThumbnailGenerationException("No thumbnails template file")
+            throw ThumbnailGenerationException("No thumbnails template file $thumbnailsPath")
         }
         val thumbnailsGeneratePath = thumbnailsPath.resolveSibling("generate")
         Files.createDirectories(thumbnailsGeneratePath)

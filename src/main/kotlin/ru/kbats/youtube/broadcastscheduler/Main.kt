@@ -10,6 +10,7 @@ import com.github.kotlintelegrambot.logging.LogLevel
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
+import com.google.api.services.youtube.model.Video
 import ru.kbats.youtube.broadcastscheduler.bot.setupDispatcher
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
@@ -45,7 +46,7 @@ class Application(private val config: Config) {
         return null
     }
 
-    internal fun LiveStream.infoMessage() = "Live Stream ${snippet.title}\n" +
+    fun LiveStream.infoMessage() = "Live Stream ${snippet.title}\n" +
             "Stream id: ${id}\n" +
             "OBS key: " + cdn.ingestionInfo.streamName +
             (status?.let { "\nStatus: ${it.streamStatus}, ${it.healthStatus.status}" } ?: "")
@@ -60,6 +61,12 @@ class Application(private val config: Config) {
             "View: https://www.youtube.com/watch?v=${id}\n" +
             "Manage: https://studio.youtube.com/video/${id}/livestreaming"
 
+    fun Video.infoMessage() = "Broadcast ${snippet.title}\n" +
+            "Status: ${status.uploadStatus}\n" +
+            "Privacy: ${status.privacyStatus}\n" +
+            "Thumbnails: ${snippet.thumbnails?.maxres?.url?.withUpdateUrlSuffix() ?: "no"}\n" +
+            "View: https://www.youtube.com/watch?v=${id}\n" +
+            "Manage: https://studio.youtube.com/video/${id}"
 
     companion object {
         const val thumbnailsDirectory = "thumbnails"
@@ -219,17 +226,24 @@ class Application(private val config: Config) {
                     )
                 )
 
-                fun addOne(callbackData: InlineKeyboardButton.CallbackData) {
-                    buttons.add(listOf(callbackData))
-                }
                 if (lecture.thumbnails != null) {
-                    addOne(InlineKeyboardButton.CallbackData("Thumbnails", "LecturesItemThumbnailsCmd${lecture.id}"))
+                    buttons.add(
+                        listOf(
+                            InlineKeyboardButton.CallbackData("Thumbnails", "LecturesItemThumbnailsCmd${lecture.id}"),
+                            InlineKeyboardButton.CallbackData(
+                                "Apply template to",
+                                "LecturesItemApplyTemplateCmd${lecture.id}"
+                            ),
+                        )
+                    )
                 }
                 if (lecture.scheduling != null) {
-                    addOne(
-                        InlineKeyboardButton.CallbackData(
-                            "Schedule broadcast",
-                            "LecturesItemSchedulingCmd${lecture.id}"
+                    buttons.add(
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                "Schedule broadcast",
+                                "LecturesItemSchedulingCmd${lecture.id}"
+                            )
                         )
                     )
                 }

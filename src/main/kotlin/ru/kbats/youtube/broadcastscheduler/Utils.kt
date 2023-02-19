@@ -15,3 +15,21 @@ fun getNextDayTimeInstant(dayOfWeek: Int, timeHour: Int, timeMinute: Int): Insta
 }
 
 fun String?.withUpdateUrlSuffix(): String? = this?.let { "$this?" + Clock.System.now().epochSeconds }
+
+object YoutubeVideoIDMatcher {
+    fun match(string: String): String? {
+        return VIDEO_URL_PATTERN.group1(string)
+            ?: LIVE_VIDEO_URL_PATTERN.group1(string)
+            ?: BE_VIDEO_URL_PATTERN.group1(string)
+            ?: VIDEO_ID_PATTERN.find(string)?.value
+    }
+
+    private fun Regex.group1(string: String): String? {
+        return find(string)?.groups?.get(1)?.value
+    }
+
+    private val VIDEO_URL_PATTERN = Regex("^https:\\/\\/www\\.youtube\\.com\\/watch\\?v=([^\\&]+)(\\&.*)?\$")
+    private val LIVE_VIDEO_URL_PATTERN = Regex("^https:\\/\\/youtube\\.com\\/live\\/([^\\?]+).*\$")
+    private val BE_VIDEO_URL_PATTERN = Regex("^https:\\/\\/youtu\\.be\\/([^\\?]+).*\$")
+    private val VIDEO_ID_PATTERN = Regex("^[A-Za-z0-9_\\-]{11}\$")
+}

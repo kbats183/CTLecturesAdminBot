@@ -93,12 +93,79 @@ class YoutubeApi(credential: Credential) {
         return youtube.liveBroadcasts().insert("snippet,status", broadcast).execute()
     }
 
-    fun uploadBroadcastThumbnail(broadcastId: String, thumbnailPngFile: File): ThumbnailSetResponse? {
-        return youtube.thumbnails().set(broadcastId, FileContent("image/png", thumbnailPngFile)).execute()
+    fun uploadVideoThumbnail(videoId: String, thumbnailPngFile: File): ThumbnailSetResponse? {
+        return youtube.thumbnails().set(videoId, FileContent("image/png", thumbnailPngFile)).execute()
     }
 
-    fun bindBroadcastStream(broadcastId: String, stramId: String): LiveBroadcast? {
+    fun bindBroadcastStream(broadcastId: String, streamId: String): LiveBroadcast? {
         return youtube.liveBroadcasts().bind(broadcastId, "id,snippet,contentDetails,status")
-            .setStreamId(stramId).execute()
+            .setStreamId(streamId).execute()
+    }
+
+    fun updateVideo(
+        videoId: String,
+        title: String,
+        description: String,
+        privacy: LectureBroadcastPrivacy,
+    ): Video? {
+        val video = Video()
+        video.id = videoId
+        video.snippet = VideoSnippet().also { videoSnippet ->
+            videoSnippet.title = title
+            videoSnippet.description = description
+            videoSnippet.categoryId = "27" // education
+        }
+        video.status = VideoStatus().apply {
+            privacyStatus = privacy.name.lowercase(Locale.getDefault())
+        }
+
+        return youtube.videos().update("snippet,status", video).execute()
+    }
+
+    fun getVideo(id: String): Video? {
+        val response =
+            youtube.videos().list("id,snippet,contentDetails,status").setId(id).setMaxResults(50L).execute()
+        return response.items.firstOrNull()
+    }
+
+
+    fun getPlaylistItems(playlistId: String? = null, videoId: String? = null): List<PlaylistItem> {
+        val request = youtube.playlistItems().list("id,snippet,status,contentDetails")
+        playlistId?.let { request.playlistId = it }
+        request.videoId = videoId
+        request.maxResults = 50
+        return request.execute().items!!
+    }
+
+    fun addVideoToPlaylist(playlistId: String, videoId: String): PlaylistItem? {
+        val item = PlaylistItem()
+        item.snippet = PlaylistItemSnippet().apply {
+            this.playlistId = playlistId
+            this.resourceId = ResourceId().apply {
+                this.kind = "youtube#video"
+                this.videoId = videoId
+            }
+        }
+        return youtube.playlistItems().insert("id,snippet", item).execute()!!
+    }
+
+    fun getAllVideosBefore(channelId: String?, limit: Int = 10000, publishedAfter: String?): List<SearchResult> {
+        val results = mutableListOf<SearchResult>()
+        var pageToken: String? = null
+        for (i in 1..100) {
+            println("page $i $pageToken")
+            val request = youtube.search().list("snippet")
+                .setChannelId(channelId)
+                .setType("type")
+                .setOrder("date")
+                .setPageToken(pageToken)
+                .setMaxResults(50)
+            publishedAfter?.let { request.publishedAfter = DateTime.parseRfc3339(publishedAfter) }
+            val response = request.execute()
+            results += response.items!!
+            pageToken = response.nextPageToken ?: break
+            Thread.sleep(1000)
+        }
+        return results
     }
 }

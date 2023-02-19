@@ -1,6 +1,7 @@
 package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.google.api.services.youtube.model.LiveBroadcast
+import com.google.api.services.youtube.model.Video
 import ru.kbats.youtube.broadcastscheduler.Application
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
 import ru.kbats.youtube.broadcastscheduler.data.LectureType
@@ -36,9 +37,29 @@ fun Application.scheduleStream(lecture: Lecture): LiveBroadcast? {
             lecture.scheduling.startHour,
             lecture.scheduling.startMinute
         ),
-        privacy = lecture.scheduling.privacy
+        privacy = lecture.privacy
     )
     broadcast ?: return null
+    setThumbnailsAndPlaylist(lecture, broadcast.id)
+    if (lecture.scheduling.streamKeyId != null) {
+        return youtubeApi.bindBroadcastStream(broadcast.id, lecture.scheduling.streamKeyId)
+    }
+    return youtubeApi.getBroadcast(broadcast.id)
+}
+
+fun Application.applyTemplateToVideo(videoId: String, lecture: Lecture): Video? {
+    val video = youtubeApi.updateVideo(
+        videoId,
+        title = lecture.currentTitle(),
+        description = lecture.description,
+        privacy = lecture.privacy
+    )
+    video ?: return null
+    setThumbnailsAndPlaylist(lecture, videoId)
+    return youtubeApi.getVideo(videoId)
+}
+
+private fun Application.setThumbnailsAndPlaylist(lecture: Lecture, videoId: String) {
     if (lecture.thumbnails != null) {
         try {
             val generateFile = Thumbnail.generate(
@@ -46,14 +67,12 @@ fun Application.scheduleStream(lecture: Lecture): LiveBroadcast? {
                 lecture.thumbnails,
                 lecture.currentThumbnailLecture()
             )
-            youtubeApi.uploadBroadcastThumbnail(broadcast.id, generateFile)
+            youtubeApi.uploadVideoThumbnail(videoId, generateFile)
         } catch (e: Thumbnail.ThumbnailGenerationException) {
             println(e)
         }
     }
-    if (lecture.scheduling.streamKeyId != null) {
-        return youtubeApi.bindBroadcastStream(broadcast.id, lecture.scheduling.streamKeyId)
+    lecture.playlistId?.let { playlistId ->
+        youtubeApi.addVideoToPlaylist(playlistId, videoId)
     }
-    return youtubeApi.getBroadcast(broadcast.id)
 }
-

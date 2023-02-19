@@ -19,7 +19,6 @@ data class LectureBroadcastScheduling(
     val startDay: Int,
     val startHour: Int,
     val startMinute: Int,
-    val privacy: LectureBroadcastPrivacy,
     val enableScheduling: Boolean = false,
     val enableAutoStart: Boolean = false,
     val enableAutoStop: Boolean = false,
@@ -40,5 +39,6 @@ data class Lecture(
     val playlistId: String? = null,
     val thumbnails: LectureThumbnails? = null,
     val scheduling: LectureBroadcastScheduling? = null,
+    val privacy: LectureBroadcastPrivacy,
     @BsonId val id: Id<Lecture> = newId(),
 )

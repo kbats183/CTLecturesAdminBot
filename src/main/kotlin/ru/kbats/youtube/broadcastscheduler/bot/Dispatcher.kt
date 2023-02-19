@@ -7,6 +7,7 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.TelegramFile
 import ru.kbats.youtube.broadcastscheduler.Application
+import ru.kbats.youtube.broadcastscheduler.YoutubeVideoIDMatcher
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
 import ru.kbats.youtube.broadcastscheduler.states.BotUserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
@@ -22,25 +23,54 @@ private fun Lecture.infoMessage(): String = "Lecture ${name}\n" +
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(repository) {
         text {
+            val chatId = ChatId.fromId(message.chat.id)
             if (text.startsWith("/addAdmin")) {
                 val components = text.split("\n")
                 if (components.size != 3) {
-                    bot.sendMessage(ChatId.fromId(message.chat.id), "Incorrect input")
+                    bot.sendMessage(chatId, "Incorrect input")
                     return@text
                 }
                 repository.addAdmin(components[1], components[2])
-                bot.sendMessage(ChatId.fromId(message.chat.id), "Ok")
+                bot.sendMessage(chatId, "Ok")
                 return@text
             }
-            when (userStates[message.chat.id]) {
+            if ("/cancel" in text) {
+                userStates[message.chat.id] = BotUserState.Default
+                return@text
+            }
+            when (val state = userStates[message.chat.id]) {
                 is BotUserState.CreatingNewLiveStream -> {
                     val newLiveStream = youtubeApi.createStream(text)
-                    bot.sendMessage(ChatId.fromId(message.chat.id), newLiveStream.infoMessage())
+                    bot.sendMessage(chatId, newLiveStream.infoMessage())
                     userStates[message.chat.id] = BotUserState.Default
                 }
+
+                is BotUserState.ApplyingTemplateToVideo -> {
+                    val videoId = YoutubeVideoIDMatcher.match(text) ?: return@text Unit.also {
+                        bot.sendMessage(chatId, text = "Invalid video id or url")
+                    }
+                    if (youtubeApi.getVideo(videoId) == null) {
+                        bot.sendMessage(chatId, text = "No video with id $videoId")
+                        return@text
+                    }
+                    val lecture = repository.getLecture(state.lectureId) ?: return@text Unit.also {
+                        bot.sendMessage(chatId, text = "No such lecture")
+                    }
+                    val applyingMessage = bot.sendMessage(chatId, text = "Applying ...")
+                    val video = applyTemplateToVideo(videoId, lecture)
+                    if (video == null) {
+                        bot.sendMessage(chatId, "Failed to schedule stream")
+                        applyingMessage.getOrNull()?.delete(bot)
+                        return@text
+                    }
+                    applyingMessage.getOrNull()?.delete(bot)
+                    bot.sendMessage(chatId, text = video.infoMessage())
+                    userStates[message.chat.id] = BotUserState.Default
+                }
+
                 else -> {
                     bot.sendMessage(
-                        ChatId.fromId(message.chat.id), text = "Main menu",
+                        chatId, text = "Main menu",
                         replyMarkup = Application.Companion.InlineButtons.mainMenu,
                     )
                 }
@@ -270,6 +300,15 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                 ChatId.fromId(callbackQuery.from.id),
                 text = scheduledStream.infoMessage(),
                 replyMarkup = Application.Companion.InlineButtons.broadcastManage(scheduledStream)
+            )
+        }
+        callbackQuery("LecturesItemApplyTemplateCmd") {
+            val id = callbackQueryId("LecturesItemApplyTemplateCmd") ?: return@callbackQuery
+            repository.getLecture(id) ?: return@callbackQuery
+            userStates[callbackQuery.from.id] = BotUserState.ApplyingTemplateToVideo(id)
+            bot.sendMessage(
+                ChatId.fromId(callbackQuery.from.id),
+                text = "Send video id or url to apply lecture template or click /cancel"
             )
         }
 
