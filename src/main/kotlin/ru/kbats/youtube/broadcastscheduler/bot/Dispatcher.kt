@@ -18,7 +18,7 @@ private fun Lecture.infoMessage(): String = "Lecture ${name}\n" +
         "Description: ${description}\n" +
         "Lecture type: ${lectureType}\n" +
         "Lecture numeration: ${if (doubleNumeration) "double" else "single"}\n" +
-        ""
+        (playlistId?.let { "Playlist: https://www.youtube.com/playlist?list=$it" } ?: "")
 
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(repository) {
@@ -94,7 +94,7 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
             userStates[callbackQuery.from.id] = BotUserState.CreatingNewLiveStream
         }
         callbackQuery("LiveStreamsListCmd") {
-            val liveStreams = youtubeApi.getStreams()
+            val liveStreams = youtubeApi.getStreams().sortedBy { it.snippet.title }
             bot.sendMessage(
                 ChatId.fromId(callbackQuery.from.id), text = "List of streams",
                 replyMarkup = Application.Companion.InlineButtons.streamsNav(liveStreams)

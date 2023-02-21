@@ -61,7 +61,7 @@ class Application(private val config: Config) {
             "View: https://www.youtube.com/watch?v=${id}\n" +
             "Manage: https://studio.youtube.com/video/${id}/livestreaming"
 
-    fun Video.infoMessage() = "Broadcast ${snippet.title}\n" +
+    fun Video.infoMessage() = "Video ${snippet.title}\n" +
             "Status: ${status.uploadStatus}\n" +
             "Privacy: ${status.privacyStatus}\n" +
             "Thumbnails: ${snippet.thumbnails?.maxres?.url?.withUpdateUrlSuffix() ?: "no"}\n" +
