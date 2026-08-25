@@ -6,9 +6,9 @@ data class Config(
     val botApiToken: String,
     val mongoDBConnectionString: String,
     val mongoDBBase: String,
-    val publicFilesUrl: String = "https://kbats.ru/ctlecbot",
-    val restreamerApiUrl: String,
-    val vkConfig: VKApi.VKApiConfig,
+    val publicFilesUrl: String = System.getenv("FILES_ENV") ?: "https://kbats.ru/ctlecbot")!!,
+val restreamerApiUrl: String,
+val vkConfig: VKApi.VKApiConfig,
 )
 
 fun config(): Config {

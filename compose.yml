@@ -1,0 +1,46 @@
+services:
+  bot:
+    image: bot:v1.1
+    restart: always
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    volumes:
+      - files_data:/app/filesRepository
+    env_file:
+      ./.env
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+  db:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      ./.env
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+  files:
+    image: nginx:alpine
+    restart: unless-stopped
+    env_file:
+      ./.env
+    volumes:
+      - files_data:/usr/share/nginx/html:ro
+    ports:
+      - "8081:80"
+  rtmp:
+    image: alfg/nginx-rtmp
+    restart: unless-stopped
+    env_file:
+      ./.env
+    ports:
+      - "1935:1935"
+      - "8082:80"
+
+volumes:
+  mongo_data:
+  files_data:
