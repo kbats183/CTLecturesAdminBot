@@ -19,7 +19,8 @@ import org.slf4j.LoggerFactory.getLogger
 
 
 class Restreamer(private val apiUrl: String) {
-    val rtmpUrl: String = System.getenv("RTMP_URL") ?: "rtmp://kbats.ru")!!,
+    val rtmpUrl: String =
+        (System.getenv("RTMP_URL") ?: "rtmp://kbats.ru")!!
 
     fun createStreamKey(key: String, targets: List<String>) {
         val request = HttpPost(apiUrl)
