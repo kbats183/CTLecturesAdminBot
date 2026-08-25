@@ -32,14 +32,6 @@ services:
       - files_data:/usr/share/nginx/html:ro
     ports:
       - "8081:80"
-  rtmp:
-    image: alfg/nginx-rtmp
-    restart: unless-stopped
-    env_file:
-      ./.env
-    ports:
-      - "1935:1935"
-      - "8082:80"
 
 volumes:
   mongo_data:
