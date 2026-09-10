@@ -23,27 +23,30 @@ fun AdminDispatcher.setupThumbnailsImagesDispatcher() {
     }
 
     inlineQuery {
-        renderInlineListItems(
-            "ThumbnailsImages", listOf(
-                InlineQueryResult.Article(
-                    id = "__add",
-                    title = "Загрузить новое изображение для превью",
-                    description = "",
-                    inputMessageContent = InputMessageContent.Text("thumbnails_image__new")
-                )
-            )
+        val images = application.repository.getThumbnailsImages()
+
+        val addButton = InlineQueryResult.Article(
+            id = "__add",
+            title = "Загрузить новое изображение для превью",
+            description = "",
+            inputMessageContent = InputMessageContent.Text("thumbnails_image__new")
+        )
+
+        renderListOrEmpty(
+            queryId = "ThumbnailsImages",
+            items = images,
+            emptyTitle = "Нет изображений",
+            emptyDescription = "Изображения пока не загружены",
+            extraItems = listOf(addButton)
         ) {
-            application.repository.getThumbnailsImages()
-                .map {
-                    InlineQueryResult.Article(
-                        id = "thumbnails_image_${it.id}",
-                        thumbUrl = application.filesRepository.getThumbnailsImagePublicUrl(it.id.toString()),
-                        title = it.name,
-                        description = "",
-                        inputMessageContent = InputMessageContent.Text("thumbnails_image_${it.id}"),
-                        replyMarkup = null,
-                    )
-                }
+            InlineQueryResult.Article(
+                id = "thumbnails_image_${it.id}",
+                thumbUrl = application.filesRepository.getThumbnailsImagePublicUrl(it.id.toString()),
+                title = it.name,
+                description = "",
+                inputMessageContent = InputMessageContent.Text("thumbnails_image_${it.id}"),
+                replyMarkup = null,
+            )
         }
     }
 

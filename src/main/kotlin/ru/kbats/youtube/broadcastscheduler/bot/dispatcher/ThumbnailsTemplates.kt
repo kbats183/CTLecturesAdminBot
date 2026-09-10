@@ -32,16 +32,21 @@ fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
     }
 
     inlineQuery {
-        renderInlineListItems("ThumbnailsTemplates") {
-            application.repository.getThumbnailsTemplates().map {
-                InlineQueryResult.Article(
-                    id = "thumbnails_template_${it.id}",
-                    thumbUrl = application.filesRepository.getThumbnailsTemplatePublicUrl(it.id),
-                    title = it.name,
-                    description = "",
-                    inputMessageContent = InputMessageContent.Text("thumbnails_template_${it.id}")
-                )
-            }
+        val templates = application.repository.getThumbnailsTemplates()
+
+        renderListOrEmpty(
+            queryId = "ThumbnailsTemplates",
+            items = templates,
+            emptyTitle = "Нет шаблонов превью",
+            emptyDescription = "Шаблоны пока не добавлены"
+        ) {
+            InlineQueryResult.Article(
+                id = "thumbnails_template_${it.id}",
+                thumbUrl = application.filesRepository.getThumbnailsTemplatePublicUrl(it.id),
+                title = it.name,
+                description = "",
+                inputMessageContent = InputMessageContent.Text("thumbnails_template_${it.id}")
+            )
         }
     }
 
