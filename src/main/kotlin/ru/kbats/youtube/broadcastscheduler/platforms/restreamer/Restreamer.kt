@@ -24,7 +24,8 @@ class Restreamer(private val apiUrl: String) {
 
     fun createStreamKey(key: String, targets: List<String>) {
         val request = HttpPost(apiUrl)
-        request.addJsonEntity(Stream(key, targets))
+        val apiTargets = targets.map(::TargetInfo)
+        request.addJsonEntity(Stream(key, apiTargets))
         client { client ->
             client.execute(request).use {
                 logger.info("Creating restreamer key $key response ${it.statusLine}")
@@ -66,10 +67,15 @@ class Restreamer(private val apiUrl: String) {
     }
 
     @Serializable
-    data class Stream(val name: String, val targets: List<String>)
+    data class Stream(val name: String, val targets: List<TargetInfo>)
 
     @Serializable
-    data class TargetInfo(val target: String)
+    data class TargetInfo(
+        val name: String,
+        val url: String
+    ) {
+        constructor(url: String) : this(if (url.startsWith("rtmp://ovsu.okcdn.ru/")) "vk" else "youtube", url)
+    }
 
     @Serializable
     data class StreamStatus(
