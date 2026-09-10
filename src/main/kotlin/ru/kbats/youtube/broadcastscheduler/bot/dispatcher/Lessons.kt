@@ -12,6 +12,51 @@ import ru.kbats.youtube.broadcastscheduler.data.Lesson
 import ru.kbats.youtube.broadcastscheduler.data.StreamKey
 import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.withUpdateUrlSuffix
+import ru.kbats.youtube.broadcastscheduler.UpdateResult
+
+suspend fun AdminDispatcher.createYoutubePlaylistForLesson(id: String): Lesson {
+    return createPlaylistForLesson(id) { lesson ->
+        val playlistId = application.youtubeApi.createPlaylist(
+            lesson.videoTitle(),
+            lesson.description(),
+            lesson.lessonPrivacy
+        )
+
+        lesson.copy(youtubePlaylistId = playlistId)
+    }
+}
+
+suspend fun AdminDispatcher.createVkPlaylistForLesson(id: String): Lesson {
+    return createPlaylistForLesson(id) { lesson ->
+        val playlistId = application.vkApi.createAlbum(
+            lesson.videoTitle(),
+            lesson.lessonPrivacy
+        )
+
+        lesson.copy(vkPlaylistId = playlistId)
+    }
+}
+
+suspend fun AdminDispatcher.createPlaylistForLesson(
+    id: String,
+    updateWithCreatedPlaylist: suspend (Lesson) -> Lesson
+): Lesson {
+    val lesson = requireNotNull(application.repository.getLesson(id)) {
+        "No such lesson with id $id"
+    }
+
+    val lessonWithPlaylist = updateWithCreatedPlaylist(lesson)
+
+    return when (
+        val result = application.repository.updateLesson(id) {
+            lessonWithPlaylist
+        }
+    ) {
+        is UpdateResult.Success -> result.value
+        UpdateResult.NotFound -> error("No such lesson with id $id")
+        UpdateResult.Failed -> error("Failed to update lesson $id")
+    }
+}
 
 fun AdminDispatcher.setupLessonsDispatcher() {
     fun Lesson.infoMessage(): String = "Записи *${name.escapeMarkdown}*\n" +
@@ -143,18 +188,23 @@ fun AdminDispatcher.setupLessonsDispatcher() {
     }
 
     inlineQuery {
-        renderInlineListItems("Lessons") {
-            application.repository.getLessons().map {
-                InlineQueryResult.Article(
-                    id = "lesson_${it.id}",
-                    thumbUrl = it.mainTemplateId?.let {
-                        application.filesRepository.getThumbnailsTemplatePublicUrl(it)
-                    },
-                    title = it.name,
-                    description = "[${it.termNumber}] ${it.title}, ${it.lecturerName}",
-                    inputMessageContent = InputMessageContent.Text("lesson_${it.id}")
-                )
-            }
+        val lessons = application.repository.getLessons()
+
+        renderListOrEmpty(
+            queryId = "Lessons",
+            items = lessons,
+            emptyTitle = "Нет уроков",
+            emptyDescription = "Уроки пока не добавлены"
+        ) {
+            InlineQueryResult.Article(
+                id = "lesson_${it.id}",
+                thumbUrl = it.mainTemplateId?.let { id ->
+                    application.filesRepository.getThumbnailsTemplatePublicUrl(id)
+                },
+                title = it.name,
+                description = "[${it.termNumber}] ${it.title}, ${it.lecturerName}",
+                inputMessageContent = InputMessageContent.Text("lesson_${it.id}")
+            )
         }
     }
 
@@ -210,15 +260,28 @@ fun AdminDispatcher.setupLessonsDispatcher() {
         val opNumber = if (op == "LessonChangeNumberIncCmd") 1 else -1
         val chatId = ChatId.fromId(callbackQuery.from.id)
         val id = callbackQueryId(op) ?: return@callbackQuery
-        val oldLesson = application.repository.getLesson(id) ?: return@callbackQuery
-        val successUpdate = application.repository.replaceLesson(
-            oldLesson.copy(currentLectureNumber = oldLesson.currentLectureNumber + opNumber * if (oldLesson.doubleNumerationFormat) 2 else 1)
-        )
-        if (!successUpdate) {
-            bot.sendMessage(chatId, "Не удалось изменить курс")
-            return@callbackQuery
+
+        val lesson = when (
+            val result = application.repository.updateLesson(id) { oldLesson ->
+                oldLesson.copy(
+                    currentLectureNumber =
+                        oldLesson.currentLectureNumber +
+                                opNumber * if (oldLesson.doubleNumerationFormat) 2 else 1
+                )
+            }
+        ) {
+            is UpdateResult.Success -> result.value
+
+            UpdateResult.Failed -> {
+                bot.sendMessage(chatId, "Не удалось изменить курс")
+                return@callbackQuery
+            }
+
+            UpdateResult.NotFound -> {
+                return@callbackQuery
+            }
         }
-        val lesson = application.repository.getLesson(oldLesson.id.toString()) ?: return@callbackQuery
+
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendLesson(chatId, lesson)
     }
@@ -347,12 +410,22 @@ fun AdminDispatcher.setupLessonsDispatcher() {
                 }
 
                 application.userStates[message.chat.id] = state.prevState
-                val successUpdate = application.repository.replaceLesson(lesson)
-                if (!successUpdate) {
-                    bot.sendMessage(chatId, "Не удалось изменить курс")
-                    return@text
+
+                val newLesson = when (
+                    val result = application.repository.updateLesson(lesson.id.toString()) {
+                        lesson
+                    }
+                ) {
+                    is UpdateResult.Success -> result.value
+
+                    UpdateResult.Failed -> {
+                        bot.sendMessage(chatId, "Не удалось изменить курс")
+                        return@text
+                    }
+
+                    UpdateResult.NotFound -> return@text
                 }
-                val newLesson = application.repository.getLesson(lesson.id.toString()) ?: return@text
+
                 state.prevMessagesIds.forEach { bot.deleteMessage(chatId, it) }
                 bot.delete(message)
                 bot.sendMessage(
@@ -437,7 +510,7 @@ fun AdminDispatcher.setupLessonsDispatcher() {
 
     callbackQuery("LessonsEditStreamKeyCancelCmd") {
         val state = application.userStates[callbackQuery.from.id]
-        if (state is UserState.ChoosingLessonThumbnailsTemplate) {
+        if (state is UserState.ChoosingLessonStreamKey) {
             application.userStates[callbackQuery.from.id] = state.prevState
         }
         callbackQuery.message?.let { bot.delete(it) }
@@ -445,21 +518,14 @@ fun AdminDispatcher.setupLessonsDispatcher() {
 
     callbackQuery("LessonCreatePlaylistYTCmd") {
         val id = callbackQueryId("LessonCreatePlaylistYTCmd") ?: return@callbackQuery
-        val lesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
-        val playlistId =
-            application.youtubeApi.createPlaylist(lesson.videoTitle(), lesson.description(), lesson.lessonPrivacy)
-        require(application.repository.replaceLesson(lesson.copy(youtubePlaylistId = playlistId))) { "Failed to update lesson $id" }
-        val newLesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
+        val newLesson = createYoutubePlaylistForLesson(id)
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendLesson(ChatId.fromId(callbackQuery.from.id), newLesson)
     }
 
     callbackQuery("LessonCreatePlaylistVKCmd") {
         val id = callbackQueryId("LessonCreatePlaylistVKCmd") ?: return@callbackQuery
-        val lesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
-        val playlistId = application.vkApi.createAlbum(lesson.videoTitle(), lesson.lessonPrivacy)
-        require(application.repository.replaceLesson(lesson.copy(vkPlaylistId = playlistId))) { "Failed to update lesson $id" }
-        val newLesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
+        val newLesson = createVkPlaylistForLesson(id)
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendLesson(ChatId.fromId(callbackQuery.from.id), newLesson)
     }
