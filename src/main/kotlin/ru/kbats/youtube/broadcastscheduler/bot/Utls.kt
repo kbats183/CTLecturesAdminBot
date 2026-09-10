@@ -8,6 +8,7 @@ import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.InlineQuery
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
@@ -489,6 +490,33 @@ suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
             inlineQueryResults = stuffResult + items.take(50 - stuffResult.size),
             nextOffset = items.getOrNull(50 - stuffResult.size)?.id ?: "end"
         ).get()
+    }
+}
+
+suspend fun <T> InlineQueryHandlerEnvironment.renderListOrEmpty(
+    queryId: String,
+    items: List<T>,
+    emptyTitle: String,
+    emptyDescription: String = "Пока ничего нет",
+    emptyMessage: String = emptyTitle,
+    extraItems: List<InlineQueryResult.Article> = emptyList(),
+    mapper: (T) -> InlineQueryResult.Article
+) {
+    if (items.isEmpty()) {
+        renderInlineListItems(queryId) {
+            extraItems + listOf(
+                InlineQueryResult.Article(
+                    id = "empty",
+                    title = emptyTitle,
+                    description = emptyDescription,
+                    inputMessageContent = InputMessageContent.Text(emptyMessage)
+                )
+            )
+        }
+    } else {
+        renderInlineListItems(queryId, extraItems) {
+            items.map(mapper)
+        }
     }
 }
 
