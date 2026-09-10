@@ -18,6 +18,12 @@ import org.bson.types.ObjectId
 import ru.kbats.youtube.broadcastscheduler.data.*
 import kotlin.random.Random
 
+sealed interface UpdateResult<out T> {
+    data class Success<T>(val value: T) : UpdateResult<T>
+    data object NotFound : UpdateResult<Nothing>
+    data object Failed : UpdateResult<Nothing>
+}
+
 class Repository(db: MongoDatabase) {
     val admin = db.getCollection<Admin>("admin")
     val lecture = db.getCollection<Lecture>("lecture")
@@ -85,6 +91,13 @@ class Repository(db: MongoDatabase) {
 
     suspend fun getLesson(id: String): Lesson? {
         return lesson.find(eq("_id", ObjectId(id))).firstOrNull()
+    }
+
+    suspend fun updateLesson(id: String, mutator: (Lesson) -> Lesson): UpdateResult<Lesson> {
+        val old = getLesson(id) ?: return UpdateResult.NotFound
+        if (!replaceLesson(mutator(old))) return UpdateResult.Failed
+        val updated = getLesson(id) ?: return UpdateResult.NotFound
+        return UpdateResult.Success(updated)
     }
 
     suspend fun insertLesson(l: Lesson): Lesson? {
